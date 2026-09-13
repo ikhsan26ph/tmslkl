@@ -99,3 +99,185 @@ Atas permintaan user: buat order dari shipment seed SHP26090093 (FTL Normal, Sur
 - **Sopir WA `6283830011881` = "Muhaimin"**, ditemukan langsung tanpa filter di list Pilih Sopir. Hati-hati nomor mirip tapi BEDA yang juga ada di list: `Ikhsan628383001188132` (ada suffix 32), dan di kolom PIC ada `IK ShopR083830011881222`/`Aamsubuser 083830011881` (tanpa prefix 62 dan/atau suffix beda) — jangan asal cocok substring, harus exact match nomor penuh.
 - **Catatan teknis datetime picker**: pada popup jam/menit (scroll list), `element.click()` mentah via `page.evaluate()` TIDAK memicu handler React (nilai tetap 00:00) — harus pakai `locator.click()` Playwright asli. Ini bukan H1 (yang soal `dispatchEvent` vs `click()` standar); nuansa baru khusus komponen scroll-picker jam/menit.
 - Data dibuat run ini (permanen, boleh dipakai reuse): Order **FTL9225168972** (dari shipment SHP26090093, kini status shipment "Proses Order"), 1 penugasan sopir Muhaimin + PIC "basyir", armada **A22S (Colt Diesel Double CDD Box)**.
+
+## 2026-09-13 — Seed data 11 shipment (batch 2), atas permintaan user langsung
+
+Bukan run test-module — pembuatan data nyata (Draft) untuk seed/reuse, mengulang playbook 2026-09-12 dengan
+prefix `AUTOTEST-20260913-`. Dikerjakan langsung oleh agent utama (bukan didelegasikan) di satu sesi browser
+berkelanjutan; sempat ada percobaan delegasi ke subagent terpisah yang dihentikan sebelum sempat mengisi/submit
+data apa pun (0 shipment dibuat oleh subagent tsb, terverifikasi via laporan berhentinya). Tidak ada data
+existing yang diubah/dihapus.
+
+| Jenis | Tipe | Rute | Nomor |
+|---|---|---|---|
+| FTL | Normal | Surabaya (IK - ST. Gubeng) → Medan (IK - Medan) | SHP26090104 |
+| FTL | Multipickup | 2 pickup Surabaya (ST. Gubeng, Kenjeran) → Medan (IK - Medan) | SHP26090105 |
+| FTL | Multidrop | Surabaya (ST. Gubeng) → 2 drop Medan (IK - Medan, IK - Medan Tempur) | SHP26090106 |
+| FTL | Multipoint | 2 pickup Surabaya × 2 drop Medan (4 kombinasi) | SHP26090107 |
+| FCL | Normal | Tanjung Perak (Surabaya) → Balikpapan, kontainer 20 Feet | SHP26090108 |
+| FCL | Multipickup | 2 pickup Surabaya → Balikpapan (IK - Balikpapan) | SHP26090109 |
+| FCL | Multidrop | Surabaya → 2 drop (IK - Balikpapan, IK - Samarinda tes) | SHP26090110 |
+| FCL | Multipoint | 2 pickup Surabaya × 2 drop (Balikpapan, Samarinda) | SHP26090111 |
+| LTL | Normal | Kota Surabaya (ST. Gubeng) → Kab. Bangkalan (VER - BKL), tarif Flat 500rb | SHP26090112 |
+| LCL | Normal | Kota Surabaya (ST. Gubeng) → Kota Balikpapan (IK - Balikpapan), tarif per-kg 500rb/kg | SHP26090113 |
+| Air Freight | Normal | Kota Surabaya (Kenjeran) → Kota Samarinda (IK - Samarinda tes), tarif per-kg 560rb/kg | SHP26090114 |
+
+- **TEMUAN PENTING — Drop Point "VER - BKL" BUKAN milik PT. H3 IK.** Saat isi Data Penerima LTL, drop point
+  Bangkalan yang muncul untuk customer PT. H3 IK hanya varian "IK - Drop Madura 1-4" dan "IK - Bangkalan
+  Intern" — tidak ada "VER - BKL". Dicek langsung ke `/master/drop-point` (cari "VER - BKL"): drop point ini
+  milik customer **PT. Verstappen** (alamat Burneh, Kabupaten Bangkalan). Jadi untuk shipment #9, Data Penerima
+  memakai company **PT. Verstappen** (bukan PT. H3 IK). Perhatian tambahan: ada DUA customer dengan nama mirip
+  di picker — "PT. Verstappen" dan "PT. Verstappen1" — harus pilih yang **tanpa suffix angka** agar cocok
+  dengan pemilik drop point tsb (dikonfirmasi lewat exact match master data, bukan tebakan). Update pengetahuan
+  dari entri 2026-09-11: TIDAK SEMUA drop point bernama "sesuatu - Kota" otomatis milik PT. H3 IK; drop point
+  ber-prefix "IK" (IK - ST. Gubeng/Kenjeran/Medan/Medan Tempur/Balikpapan/Samarinda tes) memang punya PT. H3 IK,
+  tapi drop point ber-prefix lain (mis. "VER -") kemungkinan besar milik customer lain — selalu verifikasi
+  lewat Master Drop Point kalau recipient company tidak jelas, jangan asumsikan.
+- **Perusahaan berfungsi penuh untuk Penerima FTL Normal** — kekhawatiran di brief (kemungkinan perlu fallback
+  individu manual untuk penerima FTL Normal, berdasar catatan lama selector-map) TERNYATA TIDAK TERJADI pada
+  run ini: tombol "Pilih Penerima" dengan Jenis Penerima "Perusahaan" (default) berhasil memilih PT. H3 IK
+  langsung untuk seluruh FTL/FCL (semua varian) dan LCL/Air Freight tanpa hambatan. Fallback individu manual
+  tidak diperlukan sama sekali di run ini.
+- **PIC/WA/Alamat Pengirim & Penerima auto-terisi dari Drop Point** begitu drop point dipilih (nama PIC =
+  nama drop point/pemilik, WA & alamat ikut master) — field tetap editable tapi tidak perlu diisi manual,
+  konsisten dengan temuan EDG-006 sebelumnya (auto-derive dari Drop Point).
+- **Tombol submit akhir LTL/LCL/Air Freight = "Simpan" saja** (bukan "Simpan Shipment" + "Simpan & Lanjut ke
+  Order" seperti FTL/FCL) — hanya satu tombol, tidak ada opsi lanjut ke Order di titik ini untuk ketiga jenis
+  tsb.
+- **Ongkos Kirim LTL/LCL/Air Freight OTOMATIS terhitung dari tarif master** begitu Data Barang diisi (baris
+  tabel Kalkulasi Harga berupa teks, bukan input) — beda dari FTL/FCL yang mewajibkan isi manual field
+  "Ongkos Kirim/Harga" per armada/kontainer (placeholder "0", wajib diisi manual, dipakai 3.000.000/5.000.000
+  pada run ini untuk FTL/FCL secara berurutan, nilai arbitrer non-nol).
+- **LCL Normal menghasilkan harga besar (Rp113.750.000)** karena basis per-kg dikalikan Berat(50kg) ×
+  Jumlah/Karton(5) = 250kg tertagih pada tarif Rp500.000/kg — bukan bug, hanya konsekuensi kombinasi
+  berat+jumlah yang dipilih; sekadar catatan agar tahap berikutnya tidak bingung melihat total harga tinggi.
+- **Master Bandara berisi sangat banyak entri uji/QA/data-quality-test** (XSS payload literal, nama sangat
+  panjang, karakter Unicode, banyak varian "Test IATA ...") bercampur dengan bandara asli — dipilih
+  "Juanda International" (Surabaya) dan opsi "Samarinda" (exact match tunggal) dengan hati-hati. Juga ada
+  drop point mirip-tapi-beda untuk Samarinda: "IK - Samarinda tes" (dipakai, sesuai task) vs "IK - Samrinda"
+  (typo, drop point terpisah) — jangan tertukar.
+- **Master Kontainer FCL** masih mengandung 1 entri sampah "asda" di antara 20 Feet/40 Feet/40 Feet HC/45 Feet
+  HC (konsisten dengan pola data-quality yang sama di area master lain, bukan temuan baru).
+- Data dibuat run ini (permanen, tidak dihapus, boleh dipakai reuse di tahap order+penugasan berikutnya):
+  shipment SHP26090104–SHP26090114 (11 shipment, semua status Draft). Tidak ada shipment/customer/master baru
+  lain yang dibuat di luar 11 ini.
+
+## 2026-09-13 — Buat 1 Order dari masing-masing 11 shipment batch 2, atas permintaan user langsung
+
+Dikerjakan langsung oleh agent utama (browser Playwright MCP, bukan didelegasikan). Seluruh 11 shipment
+seed SHP26090104–SHP26090114 berhasil di-order (0 gagal). Semua shipment terverifikasi berubah status ke
+"Proses Order" via query tabel Daftar Shipment setelah selesai. Tidak ada shipment/order yang dihapus atau
+dibatalkan; Penugasan sama sekali tidak disentuh (sesuai batasan tugas).
+
+- **TEMUAN PENTING — Kebab Aksi shipment LTL/LCL/Air Freight status Draf TIDAK memiliki opsi "Buat Order"
+  sama sekali** (terverifikasi 3x: SHP26090112/113/114), berbeda dari asumsi awal (dan berbeda dari FTL/FCL
+  yang selalu punya "Buat Order" di kebab). Item aktual di dropdown ketiganya: Detail, Edit, Hapus,
+  **Lihat Resi**, Proses Invoice (disabled, title "Shipment belum ditugaskan"), Tambah Biaya, Riwayat
+  Perubahan. Alur yang benar untuk LTL/LCL/Air Freight: buka `/order/buat` **kosong** (bukan
+  `?shipmentId=...`), klik kartu jenis shipment yang sesuai, isi Detail Rute (LTL/Air Freight: Kota Asal
+  & Kota Tujuan via combobox search; LCL: Pelabuhan Asal & Pelabuhan Tujuan) — begitu terisi, section
+  "Shipment Muatan *" menampilkan checkbox shipment yang cocok rute (bukan radio seperti FTL/FCL), centang
+  checkbox shipment target lalu lengkapi field lain yang muncul. FTL/FCL tetap memakai jalur asli (kebab →
+  "Buat Order" → `/order/buat?shipmentId=...` prefilled, radio bukan checkbox) — dua alur ini TIDAK bisa
+  disamakan, executor wajib mengecek kebab dulu sebelum asumsi shipmentId-prefill berlaku untuk semua jenis.
+- **Field wajib LTL (baru pertama kali dituntaskan)**: hanya **Tanggal Permintaan Muat*** dan
+  **Jenis Armada*** (Berat Maksimal/Volume Maksimal tampil sebagai `input[disabled]` auto-terisi dari jenis
+  armada, tanpa asterisk — tidak perlu diisi manual). Tidak ada field kapal/pelabuhan/bandara untuk LTL.
+  Armada dipakai: "Colt Diesel Engkel CDE Box".
+- **Field wajib LCL (baru pertama kali dituntaskan)**: Pelabuhan Asal*, Pelabuhan Tujuan*, Tanggal
+  Permintaan Muat*, Jenis Kontainer*, Jenis Jadwal Kapal* (radio native `#jadwal-direct`/`#jadwal-connecting`,
+  **sr-only, timeout via `locator.click()` biasa — WAJIB `el.click()` via `browser_evaluate`/JS langsung**,
+  konsisten dengan catatan lama selector-map), lalu setelah Direct dipilih muncul **"Detail Kapal Utama"**
+  dengan field IDENTIK FCL: Pelayaran*, Nama Kapal*, Voyage*, Closing Time* (datetime), **ETD*/ETA* TANPA
+  JAM** (tanggal saja) — dikonfirmasi sesuai catatan SCR-04 lama. Rute dipakai: Tanjung Perak → Balikpapan
+  (sama pasangan pelabuhan dengan FCL run ini), Pelayaran "Tanto", Jenis Kontainer "20 Feet".
+- **Field wajib Air Freight (baru pertama kali dituntaskan)**: Kota Asal*/Kota Tujuan* (sama pola LTL, via
+  combobox search) memicu banner segmen rute + **Bandara Asal*/Bandara Tujuan* auto-fill read-only**
+  (disabled, terisi otomatis dari kota — "Juanda International"/"Samarinda" pada rute Surabaya→Samarinda),
+  **Drop Point Bandara Asal*/Tujuan*** (combobox terpisah dari Bandara, WAJIB dipilih manual — dipakai
+  "IK - Juanda" & "IK - Internal Samarinda Bandara", satu-satunya opsi tersedia untuk tujuan), Maskapai*
+  (dipakai "Garuda"), Nomor Penerbangan* (teks bebas), **Berangkat (ETD)*/Tiba (ETA)* memakai jam PENUH**
+  (beda dari LCL/FCL yang tanpa jam untuk field sejenis — dikonfirmasi ulang sesuai catatan lama), Tanggal
+  Permintaan Muat*, Jenis Armada* (dipakai "Pickup Box"). Tidak ada Closing Time untuk Air Freight (beda
+  dari FCL/LCL).
+- **FCL (bukan pertama kali, tapi field lengkap baru benar-benar diisi run ini)**: alur `?shipmentId=...`
+  prefilled — Direct/Connecting sudah default "Direct" terpilih (`button[aria-pressed]`, BUKAN radio native
+  seperti form order-dari-shipment-kosong), lalu isi Tanggal Permintaan Muat*, Pelayaran* ("Tanto"), Nama
+  Kapal*, Voyage*, Closing Time* (16/09 08:00), ETD* (17/09, TANPA jam), ETA* (20/09, TANPA jam). Pola
+  ETD>Closing Time strict (>) dipatuhi dengan jeda 1 hari — tidak ada penolakan validasi tanggal sama
+  sekali di keempat shipment FCL (Normal/Multipickup/Multidrop/Multipoint).
+- **Gotcha eksekusi**: satu kali salah klik "Batal" alih-alih "Simpan" pada SHP26090109 (form FCL kedua)
+  karena ref stale ter-cache dari step sebelumnya — form batal tanpa efek samping (tidak ada order/data
+  tersimpan), diulang dari awal untuk shipment yang sama dan berhasil. Pelajaran: selalu `browser_find`
+  ulang teks "Simpan" tepat sebelum klik final, jangan pakai ref lama dari observasi field sebelumnya.
+- Datetime custom picker (`div[role="button"]`+grid `button.h-9.w-9` equivalent React) tetap tidak
+  auto-close di seluruh 11 shipment — pola tutup via klik ulang trigger (bukan klik luar/Escape) konsisten
+  dengan catatan lama, tidak ada regresi.
+- Order yang dihasilkan (permanen, tidak dihapus): FTL9257598176 (SHP26090104), FTL9257716586
+  (SHP26090105), FTL9257814208 (SHP26090106), FTL9257908572 (SHP26090107), FCL9258124380 (SHP26090108),
+  FCL9258568401 (SHP26090109), FCL9258802280 (SHP26090110), FCL9259027250 (SHP26090111), LTL9259386438
+  (SHP26090112), LCL9259783505 (SHP26090113), AFR9260203285 (SHP26090114). Semua tetap berstatus Draf →
+  Proses Order pada shipment asal; tidak ada Penugasan yang dibuat/diproses.
+
+## 2026-09-13 — Penugasan Tracking untuk 11 order batch 2, mode "Tugaskan ke Sopir" (6 berhasil, 5 blocked oleh desain form)
+
+Dikerjakan langsung oleh agent utama (browser Playwright MCP, bukan didelegasikan) dalam satu sesi
+berkelanjutan. Target: buat Penugasan untuk 11 order dari entri 2026-09-13 sebelumnya (FTL9257598176,
+FTL9257716586, FTL9257814208, FTL9257908572, FCL9258124380, FCL9258568401, FCL9258802280, FCL9259027250,
+LTL9259386438, LCL9259783505, AFR9260203285), sopir dgn WA `6283830011881` ("Muhaimin"), mode "Tugaskan ke
+Sopir" untuk semua. Tidak ada order/shipment/penugasan yang dihapus atau dibatalkan.
+
+- **Alur "+ Tambah Penugasan" tanpa query param** (beda dari alur modal langsung-setelah-simpan-order di
+  entri 2026-09-12 yang pakai `?orderCode=...`): dari `/penugasan-tracking` klik tombol "+ Tambah Penugasan"
+  → `/penugasan-tracking/tambah` **kosong**, heading "Pilih Order *" berisi field `getByPlaceholder('Cari
+  order...')` + daftar tombol semua order yang belum ditugaskan (teks gabung `NomorOrder • Customer JenisShipment`
+  + baris rute+armada), tanpa perlu mengetik apapun untuk order yang baru dibuat (langsung muncul di
+  daftar teratas, urut dari order terbaru). Klik tombol order → form detail termuat di bawahnya (SPA,
+  tidak reload halaman).
+- **TEMUAN BARU PENTING — struktur form Penugasan berbeda berdasar tipe shipment (Armada vs Kontainer),
+  BUKAN berdasar nama jenis (FTL/FCL/LTL/LCL/AFR) secara langsung**:
+  - **Pola "Armada"** (heading `Armada 1`, dst mengikuti Jumlah Armada di ringkasan): `Pilih Armada*`
+    (`getByPlaceholder('Cari armada...')`), `Pilih Sopir*` (`getByPlaceholder('Cari sopir...')`), **Mode
+    Penugasan* dengan KEDUA kartu aktif** ("Tugaskan ke Sopir" dan "Tugaskan ke Pengurus", tidak disabled),
+    lalu `Pilih PIC Penugasan*`. Dipakai oleh **FTL** (semua 4 varian — konsisten dgn entri 2026-09-12) DAN
+    ternyata juga **LTL** dan **Air Freight** (baru pertama kali dituntaskan lewat Penugasan Tracking run
+    ini, terverifikasi sama persis strukturnya dengan FTL, termasuk daftar armada/sopir yang identik/tidak
+    difilter by jenis — konsisten H3).
+  - **Pola "Kontainer"** (heading `Kontainer 1`): field `No. Kontainer` + `Nomor Segel` (keduanya textbox
+    kosong opsional, tidak diisi run ini karena tidak wajib), **Mode Penugasan* HANYA punya SATU kartu
+    "Tugaskan ke Pengurus" dan kartu itu ber-atribut `disabled` (sudah default terpilih, tidak bisa
+    di-switch)** — **TIDAK ADA kartu "Tugaskan ke Sopir" sama sekali**, dan **TIDAK ADA field Pilih
+    Armada/Pilih Sopir di mana pun pada form** (dikonfirmasi via `document.body.textContent` tidak
+    mengandung "Pilih Armada"/"Pilih Sopir"/"Cari armada"/"Cari sopir"). Hanya `Pilih PIC Penugasan*` yang
+    tersedia. Dipakai oleh **FCL (semua 4 varian: Normal/Multipickup/Multidrop/Multipoint)** dan **LCL**
+    (Normal) — masuk akal karena keduanya container-based (LCL = "Less than Container Load", tetap
+    dikelola per kontainer meski isi campuran). Diverifikasi individual utk kelima order ini (bukan
+    asumsi dari 1 sampel) via cek `button.disabled`/heading `h3` sebelum submit apa pun.
+  - Kesimpulan: pembeda flow Penugasan bukan "jenis shipment" (FTL/FCL/dst) melainkan **apakah shipment
+    diukur per-armada (truck) atau per-kontainer**. Hipotesis lama (2026-09-12) yang mengasumsikan FCL
+    mengikuti pola FTL **BERBEDA/TERBANTAH** — belum sempat dicatat sebagai H baru di CLAUDE.md karena tabel
+    hipotesis di sana khusus warisan OMS; catat di sini sebagai temuan asli TMS.
+- **5 order GAGAL/BLOCKED karena keterbatasan desain form** (FCL9258124380, FCL9258568401, FCL9258802280,
+  FCL9259027250, LCL9259783505) — mode "Tugaskan ke Sopir" yang diminta user **tidak tersedia sama sekali**
+  untuk order berbasis Kontainer, sehingga sopir Muhaimin (WA 6283830011881) tidak dapat ditugaskan lewat
+  form ini untuk kelima order tsb. **Tidak dipaksakan submit dengan "Tugaskan ke Pengurus"** (mode itu ada
+  dan disabled/forced, secara teknis bisa disimpan begitu saja) karena itu akan menyimpang dari mode yang
+  eksplisit diminta user tanpa konfirmasi. Order-order ini dibiarkan apa adanya (masih "belum ditugaskan"
+  di `/penugasan-tracking`), tidak ada perubahan/percobaan submit yang tersimpan ke backend untuk kelimanya.
+- **6 order BERHASIL** dengan Armada **A22S (Colt Diesel Double CDD Box)** + Sopir **Muhaimin
+  (6283830011881)** + Mode **Tugaskan ke Sopir** + PIC **basyir**, seluruhnya submit via modal konfirmasi
+  kedua "Konfirmasi Penugasan" (tombol Simpan modal di-scope terpisah dari Simpan form utama, konsisten
+  gotcha entri 2026-09-12) dan terverifikasi redirect ke `/penugasan-tracking` dengan baris status "Belum
+  Berangkat": FTL9257598176, FTL9257716586, FTL9257814208, FTL9257908572, LTL9259386438, AFR9260203285.
+  Jumlah Armada/Kontainer untuk seluruh 11 order (termasuk varian Multipickup/Multidrop/Multipoint) ternyata
+  tetap **1** (bukan lebih dari 1 seperti diduga brief tugas) — jadi tidak ada kasus multi-slot "Armada 2"
+  dst yang perlu diuji run ini.
+- **0 `role="dialog"`** pada kedua modal (form utama bukan modal, tapi "Konfirmasi Penugasan" ya) dan
+  **0 `data-testid`** — konsisten H5/H6, tidak ada regresi.
+- Data dibuat run ini (permanen, tidak dihapus): 6 Penugasan baru (armada A22S, sopir Muhaimin, PIC basyir,
+  mode Tugaskan ke Sopir) untuk FTL9257598176/FTL9257716586/FTL9257814208/FTL9257908572/LTL9259386438/
+  AFR9260203285. Tidak ada Penugasan yang dibuat untuk 5 order Kontainer (FCL×4 + LCL9259783505) — lihat
+  temuan blocked di atas.
+- **Dikonfirmasi user (2026-09-13)**: perilaku "FCL & LCL tidak bisa ditugaskan ke sopir" adalah desain
+  yang benar/diharapkan, BUKAN bug — jangan dicatat sebagai bug-candidate pada scenario planning/eksekusi
+  berikutnya untuk Penugasan Tracking jenis Kontainer.
