@@ -304,3 +304,186 @@ Sopir" untuk semua. Tidak ada order/shipment/penugasan yang dihapus atau dibatal
 - Fixture baru tersedia untuk dipakai ulang run berikutnya (JANGAN diubah levelnya tanpa mengembalikan): sub user `AUTOTEST-20260917-SUBFULL` (Shipment Akses Penuh via template lama 09-15), `AUTOTEST-20260917-VIEWONLY` (Shipment+Klaim Asuransi=Lihat Saja), `AUTOTEST-20260917-B21ALLVIEW` (SEMUA modul Lihat Saja, dipakai 11 skenario backend-mutation), `AUTOTEST-20260917-B21AIRFREIGHT` (semua modul Akses Penuh, Jenis Pengiriman dibatasi Air Freight saja — dipakai EDG-037/038/039 PASSED). Shipment acuan: `SHP26090107` (FTL, terkunci/invoiced), `SHP26090119` (tidak terkunci), `SHP26090113` (LCL), `SHP26090100` (Draft FCL), `SHP26090114`/`AFR9260203285` (Air Freight, fixture A1 utk pembatas jenis).
 - **Batch 22 (EDG-040..045, 6 skenario "Pembatas jenis global" pada Dashboard/Invoice/Klaim/HPP) seluruhnya blocked** — bukan temuan aplikasi, murni keterbatasan tooling: password sub user `AUTOTEST-20260917-B21AIRFREIGHT` tidak dicatat (sesuai kebijakan), dan reset password via UI diblokir permission classifier harness eksekusi saat sesi browser kembali ke Admin di antara batch. Rerun disarankan dengan: kredensial sub user disimpan di credential store aman di luar notes/results, atau 1 sesi sub user dipakai tanpa jeda antar-agent.
 - Data test baru semua ber-prefix `AUTOTEST-20260917-`; tidak ada data non-AUTOTEST yang dihapus/diubah permanen. Setting tenant (Batas Invoice global) sengaja TIDAK diubah meski relevan untuk NEG-100, sesuai larangan `docs/agent-guide.md`.
+
+## 2026-09-17 — Seed data 11 shipment (batch 3, akun Sub User ik12sub), atas permintaan user langsung
+
+Bukan run test-module — pembuatan data nyata (Draft) untuk seed/reuse tahap pertama pipeline
+Shipment→Order→Penugasan. Dikerjakan langsung oleh agent utama (Playwright MCP, `browser_run_code_unsafe`,
+tanpa snapshot) dalam SATU sesi browser berkelanjutan, tanpa logout/login ulang. Semua field teks bebas
+prefix `AUTOTEST-20260917-<KODE-JENIS>`. Hasil lengkap: `results/shipment-create-ui__20260917-144951.json`
+(11/11 passed, 0 failed/blocked, jadi tidak ada screenshot yang dibuat). Tidak ada data existing yang
+diubah/dihapus.
+
+- **Akun berbeda dari batch 1/2 (2026-09-12, 2026-09-13) yang memakai akun Administrator/`ik11sub@yopmail.com`.**
+  Run ini memakai akun baris #3 `config/env.md` — `ik12sub@yopmail.com` (Sub User) — sesuai instruksi tugas.
+  Sesi browser saat mulai TERNYATA sudah dalam keadaan login sebagai akun ini (peninggalan sesi run
+  sebelumnya di hari yang sama, kemungkinan run `shipment-create-ui__20260917-121816.json`/
+  `shipment-create-request__20260917-114401.json` — meski file itu mencatatkan environment.user
+  `ik11sub@yopmail.com`, catatan ini hanya melaporkan apa yang teramati di browser saat sesi ini dimulai,
+  bukan mengoreksi run sebelumnya). Tidak perlu login ulang; `goto('/login')` langsung redirect ke
+  `/monitoring` karena sesi aktif. Akses modul Shipment dan tombol "Buat Shipment" terverifikasi PENUH
+  untuk akun ini (5 kartu jenis, semua field submit berfungsi) — TIDAK ada blocker permission/403/menu
+  hilang, sehingga tahap Order/Penugasan berikutnya boleh lanjut dengan akun yang sama tanpa kekhawatiran
+  akses.
+- **Customer `PT. H3 IK` dan drop point IK-* yang sama (ST. Gubeng, Kenjeran, Medan, Medan Tempur,
+  Balikpapan, Samarinda tes) TERVERIFIKASI SAMA-SAMA tersedia untuk akun Sub User `ik12sub`** seperti akun
+  batch 1/2 — bukan data yang terikat ke satu akun/customer tertentu. Rute dipakai identik dengan batch 1/2
+  untuk memudahkan perbandingan: FTL/FCL Surabaya (ST. Gubeng/Kenjeran) → Medan (FTL) / Balikpapan+Samarinda
+  tes (FCL); LTL Surabaya (ST. Gubeng) → Medan (IK - Medan, BUKAN VER-BKL — sengaja dihindari untuk tidak
+  mengulang gotcha kepemilikan drop point lintas customer dari entri 2026-09-13); LCL Surabaya (ST. Gubeng)
+  → Balikpapan (IK - Balikpapan); Air Freight Surabaya (Kenjeran) → Samarinda (IK - Samarinda tes).
+- **Struktur form Multipickup/Multidrop/Multipoint TERVERIFIKASI SAMA persis untuk FCL seperti FTL**
+  (konsisten entri 2026-09-12): Multipickup = satu Pengirim (company) dengan N blok "Pick Up N" masing-masing
+  Drop Point sendiri, Penerima tunggal; Multidrop = Pengirim tunggal, N blok "Drop Off N" yang MASING-MASING
+  punya Jenis Penerima + Penerima (company) + Drop Point sendiri (bukan Penerima tunggal); Multipoint =
+  gabungan keduanya, Data Barang menghasilkan seluruh kombinasi pickup×drop (2×2=4 baris pada run ini).
+  Review menampilkan `Drop Point Asal`/`Drop Point Tujuan` sebagai literal "Multipickup"/"Multidrop" saat
+  lebih dari satu titik.
+- **Field wajib LCL/LTL/Air Freight pada FORM BUAT SHIPMENT (bukan form Buat Order) dikonfirmasi ulang**:
+  LCL & LTL awal hanya Kota Asal/Kota Tujuan (custom combobox `Pilih Kota`), lalu untuk LCL muncul tambahan
+  Pelabuhan Asal*/Pelabuhan Tujuan* (wajib, sesuai temuan 2026-09-12) sedangkan LTL tidak ada field pelabuhan
+  sama sekali. Air Freight awal juga hanya Kota Asal/Tujuan, tapi begitu Pengirim/Penerima (company) dipilih,
+  field **Bandara Asal*/Bandara Tujuan*** muncul sebagai dropdown **`Pilih Bandara` yang WAJIB dipilih manual**
+  (bukan auto-fill/disabled) — ini BERBEDA dari layar Buat Order kosong LTL/LCL/Air (entri 2026-09-13) yang
+  bandaranya auto-fill readonly begitu Kota Asal/Tujuan dipilih; kedua form (Buat Shipment vs Buat Order)
+  memang layar terpisah dengan perilaku field berbeda, bukan kontradiksi. Drop Point pada Air Freight juga
+  ter-filter otomatis sesuai Bandara yang dipilih (opsi drop point untuk Kenjeran/Juanda berbeda dari opsi
+  drop point umum kota Surabaya).
+- **Data Barang LCL/LTL/Air Freight pakai skema field berbeda dari FTL/FCL**: Jenis Barang*, Berat(*LCL/Air,
+  tanpa asterisk di LTL), Kemasan* (custom combobox: Plastik/Karton/Sak/Palet/Karung/Botol/Lembar/Drum/
+  Batang/BOX/DOS), Jumlah*, lalu Panjang/Lebar/Tinggi — WAJIB (`*`) khusus di Air Freight, opsional (tanpa
+  asterisk) di LCL/LTL pada run ini. Ongkos Kirim OTOMATIS terhitung dari tarif master (bukan input manual)
+  begitu Data Barang lengkap, konsisten dengan entri 2026-09-13; Air Freight sempat menampilkan "Memuat
+  tarif..." dengan Ongkos Kirim "-" sesaat sebelum nilai final muncul (~2 detik) — tunggu teks itu hilang
+  sebelum lanjut ke Review, jangan asumsikan Rp0 sebagai nilai final.
+- **Tombol submit akhir LCL/LTL/Air Freight = "Simpan" saja** (bukan "Simpan Shipment"/"Simpan & Lanjut ke
+  Order"), FTL/FCL tetap dua tombol "Simpan Shipment"/"Simpan & Lanjut ke Order" — konsisten entri 2026-09-13.
+- Tidak ada login gagal, tidak ada percobaan `dispatchEvent`/workaround H1-H4 (semua interaksi pakai
+  `locator.click()`/`fill()` standar dan berhasil, konsisten hipotesis H1/H3/H4 = BERBEDA di `CLAUDE.md`).
+- Shipment yang dihasilkan run ini (permanen, tidak dihapus, untuk dipakai tahap Order berikutnya):
+
+  | # | Jenis | Tipe | Nomor | Total Harga |
+  |---|---|---|---|---|
+  | 1 | FTL | Normal | SHP26090150 | Rp2.730.000 |
+  | 2 | FTL | Multipickup | SHP26090151 | Rp2.730.000 |
+  | 3 | FTL | Multidrop | SHP26090152 | Rp2.730.000 |
+  | 4 | FTL | Multipoint | SHP26090153 | Rp2.730.000 |
+  | 5 | FCL | Normal | SHP26090154 | Rp4.550.000 |
+  | 6 | FCL | Multipickup | SHP26090155 | Rp4.550.000 |
+  | 7 | FCL | Multidrop | SHP26090156 | Rp4.550.000 |
+  | 8 | FCL | Multipoint | SHP26090157 | Rp4.550.000 |
+  | 9 | LCL | Normal | SHP26090158 | Rp113.750.000 |
+  | 10 | LTL | Normal | SHP26090159 | Rp258.349.000 |
+  | 11 | Air Freight | Normal | SHP26090160 | Rp4.095.000 |
+
+  Semua berstatus Draf. Belum ada Order/Penugasan yang dibuat dari shipment-shipment ini di run ini.
+
+## 2026-09-17 — Buat 1 Order dari masing-masing 11 shipment batch 3 (akun Sub User ik12sub), tahap kedua pipeline
+
+Dikerjakan langsung oleh agent utama (Playwright MCP, `browser_run_code_unsafe`, tanpa snapshot) dalam SATU
+sesi browser berkelanjutan (sesi sudah login sebagai `ik12sub@yopmail.com` dari peninggalan run sebelumnya,
+tidak perlu login ulang). Target: 11 shipment Draf dari entri 2026-09-17 sebelumnya (SHP26090150–SHP26090160).
+Hasil: **11/11 passed, 0 failed, 0 blocked** (jadi tidak ada screenshot dibuat). Hasil lengkap:
+`results/shipment-order-ui__20260917-151337.json`. Semua 11 shipment terverifikasi berubah status Draf →
+"Proses Order" via query ulang `/shipment` setelah selesai. Tidak ada shipment/order lain (bukan buatan run
+ini) yang diubah/dihapus/dibatalkan; Penugasan Tracking sama sekali tidak disentuh (tahap berikutnya, agent
+terpisah).
+
+- **Akses modul Order untuk akun `ik12sub@yopmail.com` (Sub User) TERVERIFIKASI PENUH** — `/order` dan
+  `/order/buat` dapat diakses normal (tombol "Buat Order" ada, tidak ada 403/menu hilang/redirect ke halaman
+  lain). Tidak ada blocker permission ditemukan untuk modul Order pada akun ini, melengkapi verifikasi akses
+  Shipment dari entri sebelumnya.
+- **Pola alur TERVERIFIKASI SAMA PERSIS dengan entri 2026-09-13 (batch 2, akun Administrator/ik11sub)**:
+  FTL & FCL lewat kebab Aksi shipment Draf → "Buat Order" → `/order/buat?shipmentId=...` (prefilled, hanya
+  Tanggal Permintaan Muat wajib diisi untuk FTL; FCL tambah Pelayaran/Nama Kapal/Voyage/Closing Time/ETD/ETA).
+  LCL/LTL/Air Freight TIDAK punya opsi "Buat Order" di kebab (dikonfirmasi ulang untuk ketiganya) — alur benar
+  via `/order/buat` KOSONG, pilih kartu jenis, isi Detail Rute/Pelabuhan, lalu centang CHECKBOX (bukan radio)
+  shipment target di section "Shipment Muatan". Tidak ada penyimpangan pola dari batch 2 meski akun & data
+  berbeda — mengonfirmasi pola ini konsisten lintas akun Sub User maupun Administrator.
+- **Temuan baru — Jenis Jadwal Kapal FCL pada form PREFILL (`?shipmentId=...`) sudah default "Direct"
+  terpilih** (`button[aria-pressed="true"]`), berbeda dari form LCL KOSONG yang Direct/Connecting-nya berupa
+  radio native (`#jadwal-direct`) yang harus diklik manual via `evaluate` karena `sr-only`. Konsisten dengan
+  catatan lama `shared/selector-map-order.md` yang sudah membedakan kedua varian ini.
+- **Placeholder Nama Kapal/Voyage BERBEDA antara form FCL prefill vs LCL kosong**: FCL prefill pakai
+  `placeholder="Masukkan Nama Kapal"`/`"Masukkan Voyage"`, sedangkan LCL kosong pakai
+  `placeholder="Contoh: KM Meratus 1"`/`"Contoh: V-2026-06-001"` — dua komponen form berbeda meski field
+  secara logis identik, executor harus mengecek placeholder aktual per form, jangan asumsikan sama.
+- **Gotcha eksekusi datetime picker (custom, BUKAN flatpickr)**: dua kali ditemukan masalah non-fatal:
+  (1) FCL Multipoint (SHP26090157) — memilih ETA tanggal "2" tanpa navigasi bulan berikutnya ternyata memilih
+  2 September (sebelum ETD 29 September di bulan yang sama), ditolak validasi "ETA tidak boleh lebih awal
+  dari ETD" (bukan bug, murni kesalahan pemilihan tanggal skrip) — diperbaiki langsung pada form yang sama
+  (ETA→30) tanpa reload, submit ulang berhasil. (2) Air Freight (SHP26090160) — klik tombol menit pada kolom
+  scroll "MENIT" sempat memicu Playwright retry-timeout ("element outside of viewport") karena kolom belum
+  di-scroll ke posisi tombol target setelah klik jam; diselesaikan dengan `scrollIntoViewIfNeeded()` eksplisit
+  sebelum `click({force:true})`. Kedua kasus TIDAK menyebabkan data hilang atau order gagal permanen — hanya
+  butuh langkah perbaikan tambahan dalam sesi yang sama. Perilaku non-auto-close datepicker custom (tutup via
+  klik ulang trigger) tetap konsisten, tidak ada regresi.
+- **Field wajib & data yang dipakai per jenis (ringkas, detail lengkap di `notes` masing-masing skenario di
+  file hasil)**: FTL hanya Tanggal Permintaan Muat. FCL (Normal/Multipickup/Multidrop/Multipoint) — Pelayaran
+  "Tanto", Nama Kapal/Voyage prefix `AUTOTEST-20260917-FCL-<TIPE>`, Closing Time dengan jam, ETD/ETA tanpa jam
+  dengan jeda ≥1 hari dari Closing Time. LCL — Pelabuhan Tanjung Perak→Balikpapan, Kontainer 20 Feet, Direct,
+  Pelayaran Tanto, field kapal identik pola FCL. LTL — Kota Surabaya→Medan, Jenis Armada "Colt Diesel Engkel
+  CDE Box". Air Freight — Kota Surabaya→Samarinda, Bandara auto-fill (Juanda International/Samarinda), Drop
+  Point manual (IK - Juanda/IK - Internal Samarinda Bandara), Maskapai "Garuda", Nomor Penerbangan
+  `AUTOTEST-20260917-AIRFREIGHT-GA123`, ETD/ETA BERJAM, Jenis Armada "Pickup Box".
+- Order yang dihasilkan (permanen, tidak dihapus/dibatalkan): FTL9631830091 (SHP26090150), FTL9631891909
+  (SHP26090151), FTL9631919935 (SHP26090152), FTL9631930232 (SHP26090153), FCL9632017955 (SHP26090154),
+  FCL9632069333 (SHP26090155), FCL9632106298 (SHP26090156), FCL9632140511 (SHP26090157), LCL9632501490
+  (SHP26090158), LTL9632311589 (SHP26090159), AFR9632775163 (SHP26090160). Semua tetap Draf → Proses Order
+  pada shipment asal; tidak ada Penugasan yang dibuat/diproses — siap dipakai tahap Penugasan Tracking
+  berikutnya oleh agent terpisah.
+
+## 2026-09-17 — Penugasan Tracking untuk 11 order batch 3 (akun Sub User ik12sub), tahap ketiga/terakhir pipeline
+
+Dikerjakan langsung oleh agent utama (Playwright MCP, `browser_run_code_unsafe`, tanpa snapshot) dalam SATU
+sesi browser berkelanjutan (sesi peninggalan `ik12sub@yopmail.com` dari tahap Order sebelumnya, tidak perlu
+login ulang). Target: 11 order dari entri 2026-09-17 sebelumnya (FTL9631830091, FTL9631891909, FTL9631919935,
+FTL9631930232, FCL9632017955, FCL9632069333, FCL9632106298, FCL9632140511, LCL9632501490, LTL9632311589,
+AFR9632775163). Hasil: **11/11 passed, 0 failed, 0 blocked** (tidak ada screenshot dibuat). Hasil lengkap:
+`results/penugasan-tracking-ui__20260917-151735.json`.
+
+- **Akses modul Penugasan Tracking untuk akun `ik12sub@yopmail.com` (Sub User) TERVERIFIKASI PENUH** —
+  `/penugasan-tracking` dan `/penugasan-tracking/tambah` dapat diakses normal (tombol "+ Tambah Penugasan"
+  ada, heading "Pilih Order *" + `getByPlaceholder('Cari order...')` tampil, tidak ada 403/menu hilang/
+  redirect). Melengkapi verifikasi akses penuh Shipment→Order→Penugasan Tracking untuk akun Sub User ini.
+- **Pola Armada vs Kontainer TERVERIFIKASI SAMA PERSIS dengan entri 2026-09-13 (batch 2)**, lintas akun dan
+  data berbeda: **Armada** (heading `Armada 1`, field Pilih Armada*/Pilih Sopir*, Mode Penugasan* dua kartu
+  aktif, Pilih PIC Penugasan*) dipakai oleh **FTL (semua 4 varian), LTL, Air Freight** — total 6 order.
+  **Kontainer** (heading `Kontainer 1`, field No. Kontainer/Nomor Segel opsional, Mode Penugasan* HANYA satu
+  kartu "Tugaskan ke Pengurus" tanpa kartu "Tugaskan ke Sopir" sama sekali dan tanpa field Armada/Sopir di
+  form) dipakai oleh **FCL (semua 4 varian), LCL** — total 5 order. Jumlah Armada/Kontainer tetap **1** untuk
+  seluruh varian Multipickup/Multidrop/Multipoint (tidak ada multi-slot "Armada 2"/"Kontainer 2").
+- **TEMUAN BARU — komponen Pilih Armada/Pilih Sopir/Pilih PIC pada form Penugasan Tracking TIDAK memakai ARIA
+  sama sekali** (bukan `role="option"`/`role="listbox"` seperti H3 di kebanyakan combobox lain): struktur
+  DOM aktualnya `input[placeholder="Cari armada..."]` (atau "Cari sopir...", "Cari PIC...") diikuti
+  `div.max-h-36.overflow-y-auto` berisi daftar `button` polos teks gabung (mis. `A22S(Colt Diesel Double CDD
+  Box)`, `Muhaimin6283830011881`, `basyir0888881112223 • staff`) tanpa atribut role apa pun — dikonfirmasi
+  via `document.querySelectorAll('[role="option"]')` = 0 setelah combobox dibuka. Ini pola ke-5/berbeda dari
+  seluruh pola dropdown yang tercatat di H3 CLAUDE.md (custom listbox ARIA, native `<select>`, kebab tanpa
+  ARIA, kartu jenis shipment tanpa ARIA) — **field executor harus target lewat `button` + teks, BUKAN
+  `[role="option"]`**, kalau tidak locator akan timeout menunggu elemen yang tidak pernah ada.
+- **Kartu Mode Penugasan "Tugaskan ke Sopir" pada pola Armada sudah default terpilih** (class
+  `border-brand-500 bg-brand-50`, kartu "Tugaskan ke Pengurus" tetap `border-gray-200` tidak terpilih) —
+  TIDAK perlu diklik manual untuk memakai mode ini (beda dari asumsi awal run yang mengira perlu klik
+  eksplisit); executor cukup verifikasi class sebelum lanjut, klik hanya bila default ternyata bukan Sopir.
+- **Data yang dipakai konsisten untuk seluruh 6 order Armada**: Armada **A22S (Colt Diesel Double CDD Box)**
+  + Sopir **Muhaimin (6283830011881)** + Mode **Tugaskan ke Sopir** (default) + PIC **basyir
+  (0888881112223 • staff)** — opsi pertama yang match filter teks di masing-masing combobox, dipilih
+  konsisten di semua order Armada sesuai instruksi (tidak ada driver/PIC spesifik yang diwajibkan run ini).
+  Untuk 5 order Kontainer, dipakai mode **Tugaskan ke Pengurus** (satu-satunya opsi, forced) + PIC **basyir**
+  (sama dengan PIC Armada, dipilih agar konsisten lintas run) — No. Kontainer/Nomor Segel dikosongkan
+  (opsional, tidak wajib).
+- Submit seluruhnya lewat modal konfirmasi kedua "Konfirmasi Penugasan" (scope Simpan modal via
+  `div.fixed` overlay yang mengandung teks "Konfirmasi Penugasan", terpisah dari Simpan form utama — 2
+  tombol "Simpan" hidup bersamaan di DOM setelah modal terbuka, konsisten gotcha entri 2026-09-12/2026-09-13).
+  Semua 11 order terverifikasi redirect ke `/penugasan-tracking` dengan baris status "Belum Berangkat" via
+  query ulang list setelah submit.
+- **0 order blocked** — mode yang dibutuhkan (Tugaskan ke Sopir untuk Armada, Tugaskan ke Pengurus untuk
+  Kontainer) selalu tersedia sesuai pola desain yang telah dikonfirmasi user pada 2026-09-13; tidak ada
+  penyimpangan dari desain yang perlu dicatat sebagai bug-candidate.
+- Data dibuat run ini (permanen, tidak dihapus/dibatalkan): 11 Penugasan baru untuk seluruh order batch 3
+  (FTL9631830091, FTL9631891909, FTL9631919935, FTL9631930232 — armada A22S/sopir Muhaimin/PIC basyir;
+  FCL9632017955, FCL9632069333, FCL9632106298, FCL9632140511, LCL9632501490 — pengurus/PIC basyir;
+  LTL9632311589, AFR9632775163 — armada A22S/sopir Muhaimin/PIC basyir). Tidak ada order/shipment/penugasan
+  lain (bukan buatan run ini) yang diubah/dihapus/dibatalkan. Ini menuntaskan pipeline Shipment → Order →
+  Penugasan Tracking batch 3 (11/11/11 seluruhnya passed di ketiga tahap).
